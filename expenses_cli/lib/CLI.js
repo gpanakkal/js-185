@@ -17,15 +17,21 @@ class CLI {
     'search QUERY - list expenses with a matching memo field',
   ];
 
+  static showHelp() {
+    const help = 'An expense recording system \n\nCommands:\n\n' + CLI.COMMANDS.join('\n');
+    console.log(help);
+  }
+
   constructor() {
     this.expenseData = new ExpenseData();
   }
-  static handleInput() {
-    const operation = process.argv[2];
+
+  run(args) {
+    const operation = args[2];
     
     const OPERATION_MAP = {
-      list: ExpenseData.listExpenses,
-      add: CLI.addExpenseInput,
+      list: () => this.expenseData.listExpenses(),
+      add: () => this.addExpenseInput(),
     }
   
     if (!operation) {
@@ -37,17 +43,12 @@ class CLI {
     }
   }
 
-  static showHelp() {
-    const help = 'An expense recording system \n\nCommands:\n\n' + CLI.COMMANDS.join('\n');
-    console.log(help);
-  }
-
-  static addExpenseInput() {
+  addExpenseInput() {
     const [amount, memo, date] = process.argv.slice(3, 6);
     if (!amount || !memo) {
       console.log('You must provide an amount and memo.');
     } else {
-      ExpenseData.addExpense({ amount, memo, date });
+      this.expenseData.addExpense({ amount, memo, date });
     }
   }
 }

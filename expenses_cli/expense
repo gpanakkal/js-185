@@ -2,4 +2,5 @@
 require('dotenv').config();
 const { CLI } = require('./lib/CLI');
 
-CLI.handleInput();
+const cli = new CLI;
+cli.run(process.argv);
