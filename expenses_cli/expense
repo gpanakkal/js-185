@@ -1,0 +1,85 @@
+#!/usr/bin/env node
+require('dotenv').config();
+const { Client } = require('pg');
+
+const AMOUNT_MIN_WIDTH = 12;
+const COLUMN_SEPARATOR = ' | ';
+const COMMANDS = [
+  'add AMOUNT MEMO [DATE] - record a new expense',
+  'clear - delete all expenses',
+  'list - list all expenses',
+  'delete NUMBER - remove expenses with id NUMBER',
+  'search QUERY - list expenses with a matching memo field',
+];
+
+async function logQuery (queryString) {
+  const client = new Client();
+  await client.connect();
+  const data = await client.query(queryString);
+
+  // transform rows into formatted strings
+  // for each column, get the width of the widest cell
+  Object.keys(data.rows[0]).map((key) => {
+    // reduce over column, returning the max length
+    const maxWidth = data.rows
+    .reduce((max, current) => max < current[key].length ? current[key].length : max, '');
+    // pad the start of all column cells to match the widest
+    data.rows.forEach((row) => {
+      row[key] = String(row[key]).padStart(maxWidth, ' ');
+    });
+  });
+
+  // order fields and concatenate row values using ' | '
+  const displayRows = data.rows.map((row) => {
+    const formattedDate = new Date(row.created_on).toDateString();
+    const formattedAmount = row.amount.padStart(AMOUNT_MIN_WIDTH, ' ');
+    const rowOrder = [row.id, formattedDate, formattedAmount, row.memo];    
+    return rowOrder.join(COLUMN_SEPARATOR);
+  });
+
+  displayRows.forEach((displayRow) => console.log(displayRow));
+  client.end();
+}
+
+function logHelp() {
+  const help = 'An expense recording system \n\nCommands:\n\n' + COMMANDS.join('\n');
+  console.log(help);
+}
+
+function listExpenses() {
+  logQuery('SELECT * FROM expenses ORDER BY created_on ASC');
+}
+
+async function AddExpense({ amount, memo, date = new Date() }) {
+  const client = new Client();
+  await client.connect();
+  const formattedDate = date.toLocaleDateString();
+  try {
+    const success = await client.query(
+      'INSERT INTO expenses (amount, memo, created_on) VALUES ($1, $2, $3)',
+      [amount, memo, formattedDate]
+    );
+    // console.log({ success: Array.isArray(success.rows) });
+  } catch(e) {
+    console.error(e);
+  } finally {
+    await client.end();
+  }
+}
+
+const arg = process.argv[2];
+if (arg === 'list') {
+  listExpenses();
+} else if (arg === 'add') {
+  const [amount, memo, date] = process.argv.slice(3, 6);
+  if (!amount || !memo) {
+    console.log('You must provide an amount and memo.');
+  } else {
+    AddExpense({ amount, memo, date });
+  }
+} else if (!arg) {
+  // display help
+  logHelp();  
+} else {
+  console.log('Argument unrecognized');
+}
