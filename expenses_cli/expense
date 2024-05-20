@@ -12,12 +12,17 @@ const COMMANDS = [
   'search QUERY - list expenses with a matching memo field',
 ];
 
-async function logQuery (queryString) {
-  const client = new Client();
-  await client.connect();
-  const data = await client.query(queryString);
+function logAndExit(rejectedPromise) {
+  console.error(rejectedPromise);
+  process.exit(1);
+}
 
-  // transform rows into formatted strings
+function showHelp() {
+  const help = 'An expense recording system \n\nCommands:\n\n' + COMMANDS.join('\n');
+  console.log(help);
+}
+
+function normalizeCellWidths(data) {
   // for each column, get the width of the widest cell
   Object.keys(data.rows[0]).map((key) => {
     // reduce over column, returning the max length
@@ -28,22 +33,32 @@ async function logQuery (queryString) {
       row[key] = String(row[key]).padStart(maxWidth, ' ');
     });
   });
+}
 
-  // order fields and concatenate row values using ' | '
+function getFormattedRows(data) {
+  // transform rows into formatted strings
+  normalizeCellWidths(data);
+  // order fields and concatenate row values
   const displayRows = data.rows.map((row) => {
     const formattedDate = new Date(row.created_on).toDateString();
     const formattedAmount = row.amount.padStart(AMOUNT_MIN_WIDTH, ' ');
-    const rowOrder = [row.id, formattedDate, formattedAmount, row.memo];    
-    return rowOrder.join(COLUMN_SEPARATOR);
+    const orderedRow = [row.id, formattedDate, formattedAmount, row.memo];    
+    return orderedRow.join(COLUMN_SEPARATOR);
   });
 
-  displayRows.forEach((displayRow) => console.log(displayRow));
-  client.end();
+  return displayRows;
 }
 
-function logHelp() {
-  const help = 'An expense recording system \n\nCommands:\n\n' + COMMANDS.join('\n');
-  console.log(help);
+async function logQuery (queryString) {
+  const client = new Client();
+  let data;
+  await client.connect().catch(logAndExit);
+  data = await client.query(queryString).catch(logAndExit);
+  await client.end().catch(logAndExit);
+
+  const displayRows = getFormattedRows(data);
+  displayRows.forEach((displayRow) => console.log(displayRow));
+  await client.end();
 }
 
 function listExpenses() {
@@ -52,34 +67,38 @@ function listExpenses() {
 
 async function AddExpense({ amount, memo, date = new Date() }) {
   const client = new Client();
-  await client.connect();
   const formattedDate = date.toLocaleDateString();
-  try {
-    const success = await client.query(
-      'INSERT INTO expenses (amount, memo, created_on) VALUES ($1, $2, $3)',
-      [amount, memo, formattedDate]
-    );
-    // console.log({ success: Array.isArray(success.rows) });
-  } catch(e) {
-    console.error(e);
-  } finally {
-    await client.end();
-  }
+  await client.connect().catch(logAndExit);
+  const success = await client.query(
+    'INSERT INTO expenses (amount, memo, created_on) VALUES ($1, $2, $3)',
+    [amount, memo, formattedDate]
+  ).catch(logAndExit);
+  // console.log({ success: Array.isArray(success.rows) });
+  await client.end().catch(logAndExit);
 }
 
-const arg = process.argv[2];
-if (arg === 'list') {
-  listExpenses();
-} else if (arg === 'add') {
+function addExpenseInput() {
   const [amount, memo, date] = process.argv.slice(3, 6);
   if (!amount || !memo) {
     console.log('You must provide an amount and memo.');
   } else {
     AddExpense({ amount, memo, date });
   }
-} else if (!arg) {
-  // display help
-  logHelp();  
-} else {
-  console.log('Argument unrecognized');
 }
+
+(() => {
+  const operation = process.argv[2];
+  
+  const OPERATION_MAP = {
+    list: listExpenses,
+    add: addExpenseInput,
+  }
+
+  if (!operation) {
+    showHelp();  
+  } else if (operation in OPERATION_MAP) {
+    OPERATION_MAP[operation]();
+  } else {
+    console.log('Argument unrecognized');
+  }
+})();
