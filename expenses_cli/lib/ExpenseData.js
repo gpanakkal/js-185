@@ -1,6 +1,11 @@
 const { Client } = require('pg');
 
-const AMOUNT_MIN_WIDTH = 12;
+const MIN_WIDTHS = {
+  id: 1,
+  amount: 12,
+  memo: 12,
+  created_on: 15,
+}
 const COLUMN_SEPARATOR = ' | ';
 
 function logAndExit(rejectedPromise) {
@@ -9,122 +14,132 @@ function logAndExit(rejectedPromise) {
 }
 
 class ExpenseData {
-  static normalizeCellWidths(data) {
+  static getColumnWidths(data) {
     // for each column, get the width of the widest cell
-    Object.keys(data.rows[0]).map((key) => {
+    return Object.keys(data.rows[0]).reduce((acc, key) => {
       // reduce over column, returning the max length
       const maxWidth = data.rows
       .reduce((max, current) => {
-        const currentLength = String(current[key]).length;
-        return max < currentLength ? currentLength : max;
+        const value = key === 'created_on' 
+          ? new Date(current[key]).toDateString() 
+          : current[key];
+        const currentLength = String(value).length;
+        const lengthToUse = Math.max(MIN_WIDTHS[key], currentLength);
+        return max < lengthToUse ? lengthToUse : max;
       }, '');
+        return Object.assign(acc, { [key]: maxWidth });
+    }, {});
+  }
+
+  static normalizeCellWidths(data) {
+    const columnWidths = ExpenseData.getColumnWidths(data);
+    Object.keys(data.rows[0]).map((key) => {
       // pad the start of all column cells to match the widest
       data.rows.forEach((row) => {
-        row[key] = String(row[key]).padStart(maxWidth, ' ');
+        row[key] = String(row[key]).padStart(columnWidths[key], ' ');
       });
     });
   }
 
-  static getFormattedRows(data) {
+  static formattedRows(data) {
     // transform rows into formatted strings
     ExpenseData.normalizeCellWidths(data);
     // order fields and concatenate row values
     const displayRows = data.rows.map((row) => {
       const formattedDate = new Date(row.created_on).toDateString();
-      const formattedAmount = row.amount.padStart(AMOUNT_MIN_WIDTH, ' ');
-      const orderedRow = [row.id, formattedDate, formattedAmount, row.memo];    
+      const formattedAmount = row.amount.padStart(MIN_WIDTHS.amount, ' ');
+      const orderedRow = [row.id, formattedDate, row.amount, row.memo];    
       return orderedRow.join(COLUMN_SEPARATOR);
     });
   
     return displayRows;
   }
 
-  constructor() {
-    this.client = new Client();
-  }
-
-  async _initializeTable() {
-    const tableExistsQuery = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'test'"
-    const tableExists = await this.client.query(tableExistsQuery);
-    if (!tableExists) {
-      await this.client.query('CREATE TABLE expenses (id serial PRIMARY KEY, amount decimal(6, 2) NOT NULL CHECK (amount > 0), memo text NOT NULL, created_on date NOT NULL)');
-    }
-  }
-
-  async _execQuery(queryString, queryParams = undefined) {
-    await this.client.connect().catch(logAndExit);
-    const data = await this.client.query(queryString, queryParams).catch(logAndExit);
-    await this.client.end().catch(logAndExit);
-    return data;
-  }
-
-  _logFormattedRows(data) {
+  static _logFormattedRows(data) {
     if (data.rows.length === 0) return;
-    const displayRows = ExpenseData.getFormattedRows(data);
+    const displayRows = ExpenseData.formattedRows(data);
     displayRows.forEach((displayRow) => console.log(displayRow));
   }
 
-  displayExpenses(data) {
+  static displayTotal(data) {
+    const total = data.rows.reduce((sum, current) => sum + Number(current.amount), 0.0);
+    const columnWidths = ExpenseData.getColumnWidths(data);
+    
+    const allColumnWidth = Object.values(columnWidths)
+      .reduce((sum, current) => sum + current, 0);
+    const separatorWidth = (Object.keys(columnWidths).length - 1) * COLUMN_SEPARATOR.length;
+    const totalWidth = allColumnWidth + separatorWidth;
+    const totalPrefix = 'Total';
+    const amountOffset = columnWidths.id + columnWidths.created_on + columnWidths.amount + 2 * COLUMN_SEPARATOR.length - String(total).length - totalPrefix.length;
+    const spaces = ' '.repeat(amountOffset); // placeholder for the dynamically generated width
+    console.log('-'.repeat(totalWidth));
+    console.log(`${totalPrefix}${spaces}${total}`);
+  }
+
+  static displayExpenses(data) {
     const length = data.rows.length ? data.rows.length : 'no';
     const template = length === 1 ? 'There is 1 expense.' : `There are ${length} expenses.`;
     console.log(template);
     this._logFormattedRows(data);
+    if (length > 0) this.displayTotal(data);
   }
 
-  displayTotal(data) {
-    const total = data.rows.reduce((sum, current) => sum + Number(current.amount), 0.0);
-    console.log('-'.repeat(49));
-    const spaces = ' '.repeat(25); // placeholder for the dynamically generated width
-    console.log(`Total${spaces}${total}`);
+  async _setupSchema(client) {
+    const tableExistsQuery = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'expenses'"
+    const result = await client.query(tableExistsQuery).catch(logAndExit);
+    const tableExists = result.rows[0].count === '1';
+    // console.log({tableExists: tableExists})
+    if (!tableExists) {
+      await client.query('CREATE TABLE expenses (id serial PRIMARY KEY, amount decimal(6, 2) NOT NULL CHECK (amount > 0), memo text NOT NULL, created_on date NOT NULL)');
+    }
+  }
+
+  async _execQuery(queryString, queryParams = undefined) {
+    const client = new Client();
+    await client.connect().catch(logAndExit);
+    await this._setupSchema(client);
+    const data = await client.query(queryString, queryParams).catch(logAndExit);
+    await client.end().catch(logAndExit);
+    return data;
   }
 
   async listExpenses() {
     const data = await this._execQuery('SELECT * FROM expenses ORDER BY created_on ASC');
-    this.displayExpenses(data);
-    this.displayTotal(data);
+    ExpenseData.displayExpenses(data);
   }
 
   async searchExpenses(term) {
     const queryString = 'SELECT * FROM expenses WHERE memo ILIKE $1 ORDER BY created_on ASC';
     const data = await this._execQuery(queryString, [`%${term}%`]);
-    this.displayExpenses(data);
-    this.displayTotal(data);
+    ExpenseData.displayExpenses(data);
   }
 
   async addExpense({ amount, memo, date = new Date() }) {
-    const formattedDate = date.toLocaleDateString();
-    await this.client.connect().catch(logAndExit);
-    const success = await this.client.query(
-      'INSERT INTO expenses (amount, memo, created_on) VALUES ($1, $2, $3)',
-      [amount, memo, formattedDate]
-    ).catch(logAndExit);
+    const formattedDate = new Date(date).toLocaleDateString();
+    const queryString = 'INSERT INTO expenses (amount, memo, created_on) VALUES ($1, $2, $3)';
+    const success = await this._execQuery(queryString, [amount, memo, formattedDate]);
     console.log(`Expense added with amount ${amount}, memo ${memo}, and date ${formattedDate}`);
-    await this.client.end().catch(logAndExit);
   }
 
   async deleteExpense(id) {
-    await this.client.connect().catch(logAndExit);
-    const matches = await this.client.query('SELECT * FROM expenses WHERE id = $1', [id])
-    .catch(logAndExit);
+    const selectQuery = 'SELECT * FROM expenses WHERE id = $1';
+    const matches = await this._execQuery(selectQuery, [id]);
     if (!matches.rowCount) {
       console.log(`There is no expense with ID '${id}'.`);
-    } else {
-      const success = await this.client.query('DELETE FROM expenses WHERE id = $1', [id])
-        .catch(logAndExit);
-      if (success.rowCount) {
-        console.log('The following expense has been deleted:');
-        this._logFormattedRows(matches);
-      }
+      return;
     }
-    await this.client.end().catch(logAndExit);
+    const deleteQuery = 'DELETE FROM expenses WHERE id = $1';
+    const success = await this._execQuery(deleteQuery, [id]);
+    if (success.rowCount) {
+      console.log('The following expense has been deleted:');
+      this._logFormattedRows(matches);
+    }
   }
 
   async deleteAllExpenses() {
-    await this.client.connect().catch(logAndExit);
-    console.log('beginning deletion');
-    await this.client.query('DELETE FROM expenses').catch(logAndExit);
-    console.log('All expenses have been deleted');
-    await this.client.end().catch(logAndExit);
+    // console.log('beginning deletion');
+    this._execQuery('DELETE FROM expenses');
+    console.log('All expenses have been deleted.');
   }
 }
 

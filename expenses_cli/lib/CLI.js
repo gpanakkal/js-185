@@ -61,7 +61,7 @@ class CLI {
   }
 
   verifyClear() {
-    console.log('This will irreversibly remove all expenses. Enter y to confirm');
+    console.log('This will irreversibly remove all expenses! Enter y to confirm:');
 
     const rl = createInterface({
       input: process.stdin,
