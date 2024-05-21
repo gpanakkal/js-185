@@ -1,5 +1,3 @@
-
-
 CREATE TABLE expenses (
   id serial 
     PRIMARY KEY,
@@ -11,4 +9,3 @@ CREATE TABLE expenses (
   created_on date 
     NOT NULL
 );
-

@@ -1,3 +1,4 @@
+const { createInterface } = require('node:readline/promises');
 const { ExpenseData } = require("./ExpenseData");
 
 // const COMMANDS = [
@@ -26,12 +27,19 @@ class CLI {
     this.expenseData = new ExpenseData();
   }
 
+  static init() {
+    
+  }
+
   run(args) {
     const operation = args[2];
     
     const OPERATION_MAP = {
       list: () => this.expenseData.listExpenses(),
       add: () => this.addExpenseInput(),
+      search: () => this.expenseData.searchExpenses(args[3]),
+      delete: () => this.expenseData.deleteExpense(args[3]),
+      clear: () => this.verifyClear(),
     }
   
     if (!operation) {
@@ -50,6 +58,24 @@ class CLI {
     } else {
       this.expenseData.addExpense({ amount, memo, date });
     }
+  }
+
+  verifyClear() {
+    console.log('This will irreversibly remove all expenses. Enter y to confirm');
+
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      });
+
+    rl.on('line', async (line) => {
+      if (line.toLowerCase() === 'y') {
+        await this.expenseData.deleteAllExpenses();
+      } else {
+        console.log('Deletion cancelled.');
+      }
+      process.exit();
+    });
   }
 }
 
