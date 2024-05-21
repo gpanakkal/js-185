@@ -6,7 +6,7 @@ const flash = require("express-flash");
 const session = require("express-session");
 const { body, validationResult } = require("express-validator");
 const store = require("connect-loki");
-const PGPersistence = require('./lib/pg-persistence');
+const Persistence = require('./lib/pg-persistence');
 const catchError = require('./lib/catch-error');
 // #endregion
 
@@ -42,7 +42,7 @@ app.use(flash());
 
 // Create a new datastore
 app.use((req, res, next) => {
-  res.locals.store = new PGPersistence(req.session);
+  res.locals.store = new Persistence(req.session);
   next();
 });
 
@@ -135,7 +135,7 @@ app.post("/lists",
     } else {
       const added = store.createTodoList(title);
       if (!added) throw new Error('Failed to create list');
-      
+
       req.flash("success", "The todo list has been created.");
       res.redirect("/lists");
     }

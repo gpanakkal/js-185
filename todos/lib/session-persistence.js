@@ -121,4 +121,10 @@ module.exports = class SessionPersistence {
   isUniqueConstraintViolation(_error) {
     return false;
   }
+
+  createTodoList(title) {
+    const newList = { title, id: nextId(), todos: [] };
+    this._todoLists.push(newList);
+    return true;
+  }
 };
