@@ -1,0 +1,40 @@
+{
+  "name": "Todos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "todos.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "heroku-postbuild": "npm install --production",
+    "start": "npx nodemon todos.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/cli": "^7.12.1",
+    "@babel/core": "^7.12.1",
+    "@babel/preset-env": "^7.12.1",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^7.11.0",
+    "nodemon": "^2.0.5"
+  },
+  "dependencies": {
+    "bcrypt": "^5.0.0",
+    "connect-loki": "^1.1.0",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-flash": "0.0.2",
+    "express-session": "^1.17.1",
+    "express-validator": "^6.6.1",
+    "morgan": "^1.10.0",
+    "pg": "^8.4.1",
+    "pug": "^3.0.0"
+  },
+  "engines": {
+    "node": "13.1.0",
+    "npm": "6.12.1"
+  }
+}
