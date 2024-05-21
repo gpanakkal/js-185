@@ -117,4 +117,8 @@ module.exports = class SessionPersistence {
     this._todoLists.splice(listIndex, 1);
     return true;
   }
+
+  isUniqueConstraintViolation(_error) {
+    return false;
+  }
 };

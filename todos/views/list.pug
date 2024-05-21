@@ -15,7 +15,7 @@ block main
             button.edit(type="submit") Edit List
 
     ul
-      each todo in todos
+      each todo in todoList.todos
         li(class=todo.done ? "done" : "")
           form.check(action=`/lists/${todoList.id}/todos/${todo.id}/toggle`
                      method="post")

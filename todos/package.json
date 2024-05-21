@@ -16,11 +16,13 @@
   },
   "dependencies": {
     "connect-loki": "^1.1.0",
+    "dotenv": "^16.4.5",
     "express": "^4.17.1",
     "express-flash": "0.0.2",
     "express-session": "^1.17.0",
     "express-validator": "^6.2.0",
     "morgan": "^1.9.1",
+    "pg": "^8.11.5",
     "pug": "^2.0.4"
   }
 }
