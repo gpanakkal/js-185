@@ -1,11 +1,11 @@
 extends layout
 
 block main
-  section#todos(class=todoList.isDone() ? "done" : "")
+  section#todos(class=todoListInfo.isDone ? "done" : "")
     header
       h2= todoList.title
       ul
-        if todoList.size() > 0 && !todoList.isDone()
+        if todoListInfo.countAllTodos > 0 && !todoListInfo.isDone
           li
             form.complete_all(action=`/lists/${todoList.id}/complete_all`
                               method="post")
@@ -16,10 +16,10 @@ block main
 
     ul
       each todo in todos
-        li(class=todo.isDone() ? "done" : "")
+        li(class=todo.done ? "done" : "")
           form.check(action=`/lists/${todoList.id}/todos/${todo.id}/toggle`
                      method="post")
-            input(type="hidden" name="done" value=!todo.isDone())
+            input(type="hidden" name="done" value=!todo.done)
             button Done
 
           h3= todo.title
