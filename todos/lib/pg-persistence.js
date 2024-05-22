@@ -1,4 +1,5 @@
 const { dbQuery } = require("./db-query");
+const bcrypt = require('bcrypt');
 
 module.exports = class PGPersistence {
   // Find a todo list with the indicated ID. Returns `undefined` if not found.
@@ -125,6 +126,36 @@ module.exports = class PGPersistence {
     } catch(error) {
       if (this.isUniqueConstraintViolation(error)) return false;
       throw error;
+    }
+  }
+
+  async validateUser(username, password) {
+    const HASHED_PASSWORD_QUERY = 'SELECT password FROM users WHERE username = $1';
+    const result = await dbQuery(HASHED_PASSWORD_QUERY, username);
+    if (result.rowCount === 0) return false;
+
+    return bcrypt.compare(password, result.rows[0].password);
+  }
+
+  // beware not to use this on already-hashed passwords!
+  async _hashExistingPasswords() {
+    try {
+      const result = await dbQuery('SELECT password FROM users');
+      const updates = [];
+      for (const row of result.rows) {
+        const currentPassword = row.password;
+        bcrypt.hash(currentPassword, 10, (_, hash) => {
+          console.log({hash});
+          const updateQuery = 'UPDATE users SET password = $1 WHERE password = $2';
+          const updateResult = dbQuery(updateQuery, hash, currentPassword);    
+          updates.push(updateResult);
+        });     
+      }
+      await Promise.all(updates);
+      return true;
+    } catch(error) {
+      console.error(error);
+      return false;
     }
   }
 };
