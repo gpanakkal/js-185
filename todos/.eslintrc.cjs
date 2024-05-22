@@ -23,7 +23,6 @@ module.exports = {
   },
   rules: {
     'no-console': 'off',
-    'no-debugger': 0,
-    'max-classes-per-file': ['error', 3],
+    'no-underscore-dangle': 'off',
   },
 };

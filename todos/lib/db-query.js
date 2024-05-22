@@ -1,4 +1,4 @@
-const { Client } = require("pg");
+const { Client } = require('pg');
 
 const logQuery = (statement, params) => {
   const timestamp = new Date();
@@ -8,11 +8,11 @@ const logQuery = (statement, params) => {
 
 module.exports = {
   async dbQuery(statement, ...params) {
-    let client = new Client();
+    const client = new Client();
     await client.connect();
-    // logQuery(statement, params);
+    logQuery(statement, params);
     const data = await client.query(statement, params);
     await client.end();
     return data;
-  }
-}
+  },
+};
